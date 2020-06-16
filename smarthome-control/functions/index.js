@@ -24,12 +24,38 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 const firebaseRef = admin.database().ref('/');
 
+exports.login = functions.https.onRequest((request, response) => {
+  if (request.method === 'GET') {
+    console.log('Requesting login page');
+    response.send(`
+    <html>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <body>
+        <form action="/login" method="post">
+          <input type="hidden" name="responseurl" value="${request.query.responseurl}" />
+          <button type="submit" style="font-size:14pt">Link this service to Google</button>
+        </form>
+      </body>
+    </html>
+  `);
+  } else if (request.method === 'POST') {
+    // Here, you should validate the user account.
+    // In this sample, we do not do that.
+    const responseurl = decodeURIComponent(request.body.responseurl);
+    console.log(`Redirect to ${responseurl}`);
+    return response.redirect(responseurl);
+  } else {
+    // Unsupported method
+    response.send(405, 'Method Not Allowed');
+  }
+});
+
 exports.fakeauth = functions.https.onRequest((request, response) => {
   const responseurl = util.format('%s?code=%s&state=%s',
     decodeURIComponent(request.query.redirect_uri), 'xxxxxx',
     request.query.state);
-  console.log(responseurl);
-  return response.redirect(responseurl);
+  console.log(`Set redirect as ${responseurl}`)
+  return response.redirect(`/login?responseurl=${encodeURIComponent(responseurl)}`);
 });
 
 exports.faketoken = functions.https.onRequest((request, response) => {
@@ -43,14 +69,14 @@ exports.faketoken = functions.https.onRequest((request, response) => {
   if (grantType === 'authorization_code') {
     obj = {
       token_type: 'bearer',
-      access_token: '123access',
-      refresh_token: '123refresh',
+      access_token: '456access',
+      refresh_token: '456refresh',
       expires_in: secondsInDay,
     };
   } else if (grantType === 'refresh_token') {
     obj = {
       token_type: 'bearer',
-      access_token: '123access',
+      access_token: '456access',
       expires_in: secondsInDay,
     };
   }
@@ -60,7 +86,9 @@ exports.faketoken = functions.https.onRequest((request, response) => {
 
 let jwt
 try {
-  jwt = require('./smart-home-key.json')
+  var jwtFile = (functions.config().jwt.file || "./smart-home-key.json" )
+  var jwtPath = path.join(__dirname, jwtFile);
+  var fwt = fs.readFileSync(jwtPath);
 } catch (e) {
   console.warn('Service account key is not found')
   console.warn('Report state and Request sync will be unavailable')
@@ -99,7 +127,7 @@ app.onSync((body) => {
   return {
     requestId: body.requestId,
     payload: {
-      agentUserId: '123',
+      agentUserId: '456',
       devices: deviceitems
     },
   };
@@ -290,9 +318,9 @@ exports.smarthome = functions.https.onRequest(app);
 
 exports.requestsync = functions.https.onRequest(async (request, response) => {
   response.set('Access-Control-Allow-Origin', '*');
-  console.info('Request SYNC for user 123');
+  console.info('Request SYNC for user 456');
   try {
-    const res = await app.requestSync('123');
+    const res = await app.requestSync('456');
     console.log('Request sync completed');
     response.json(res.data);
   } catch (err) {
@@ -352,8 +380,8 @@ exports.reportstate = functions.database.ref('{deviceId}').onWrite(async (change
   }
 
   const postData = {
-    requestId: 'ff36a3ccsiddhy', /* Any unique ID */
-    agentUserId: '123', /* Hardcoded user ID */
+    requestId: 'sfdf093sfklol', /* Any unique ID */
+    agentUserId: '456', /* Hardcoded user ID */
     payload: {
       devices: {
         states: {
